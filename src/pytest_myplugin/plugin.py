@@ -10,8 +10,13 @@ import pytest
 from . import __version__
 from .fixtures.base import service_manager
 from .fixtures.github import github_client
+from .fixtures.github_ui import github_logged_in_page
 
-__all__ = ["github_client", "service_manager"]
+__all__ = [
+    "github_client",
+    "github_logged_in_page",
+    "service_manager",
+]
 
 
 @dataclass(frozen=True, slots=True)

@@ -5,11 +5,10 @@
 ## 项目能力
 
 - `pytest11` 插件入口点，安装后由 pytest 自动加载
-- `github_client`、`gitlab_client` 等按 SDK 命名的 fixture
-- `TOML` 服务配置、环境变量解析和多配置文件合并
+- 支持SDK集成，调用API测试
+- 集成playwright，支持UI测试
+- 测试配置统一管理与加载
 - SDK 客户端懒加载、缓存和 session 结束统一关闭
-- 每个 SDK 独立封装在 `services/<sdk>.py`
-- PyGithub 服务封装作为现成示例
 - 使用 pytest 自带 `pytester` 的插件集成测试
 - Ruff、coverage 和 wheel/sdist 构建配置
 
@@ -24,21 +23,12 @@ python -m pip install -e ".[dev]"
 
 ## 服务配置
 
-默认配置位于 `src/pytest_myplugin/config/default.toml`：
+项目配置位于 `config/services.toml`
 
 ```toml
 [services.github]
 base_url = "https://api.github.com"
-token = "${GITHUB_TOKEN:-}"
-timeout = 15
-```
-
-项目配置位于 `config/services.toml`，会覆盖包内默认值：
-
-```toml
-[services.github]
-base_url = "https://api.github.com"
-token = "${GITHUB_TOKEN:-}"
+token = "${GITHUB_TOKEN}"
 timeout = 15
 
 # 后续可以继续增加其他 SDK
@@ -57,7 +47,6 @@ ${GITHUB_TOKEN:-anonymous}
 ```
 
 真实 token 不应写入仓库。推荐：
-
 ```bash
 export GITHUB_TOKEN=github_pat_xxx
 export GITLAB_TOKEN=glpat_xxx
@@ -106,18 +95,48 @@ def test_emojis(github_client):
     assert "smile" in emojis
 ```
 
-需要原生 PyGithub 客户端时使用 `github_client.raw_client`。这些示例会访问真实 GitHub API；项目单元测试使用 fake SDK，不依赖网络。
+需要原生 PyGithub 客户端时使用 `github_client.raw_client`。这些示例会访问真实 GitHub API；
 
-## Live GitHub 集成测试
 
-`tests/test_github_search_live.py` 会真实调用 GitHub Search API。未配置 token 时自动跳过：
+
+## Playwright UI 测试
+
+项目使用 `pytest-playwright`，测试代码可以直接使用 `page`、`context` 和 `browser` fixture。
+
+首次安装 Playwright 浏览器：
 
 ```bash
-export GITHUB_TOKEN=github_pat_xxx
-pytest tests/test_github_search_live.py -m integration
+python -m playwright install chromium
 ```
 
-该测试通过 `github_client.search_repositories()` 搜索公开 Python 仓库，并验证返回的仓库名称和链接。
+运行 UI 测试：
+
+```bash
+# 只运行 UI 测试
+pytest tests/ui -m ui
+
+# 在已安装的 Google Chrome 中运行
+pytest tests/ui -m ui --browser-channel=chrome
+
+# 有界面模式，便于本地调试
+pytest tests/ui -m ui --browser-channel=chrome --headed
+
+# 使用其他 Playwright 浏览器前需要先安装对应 browser
+pytest tests/ui -m ui --browser firefox
+```
+
+[test_github_login.py](tests/ui/test_github_login.py) 会访问真实 GitHub 页面。登录动作封装在 [github_ui.py](src/pytest_myplugin/fixtures/github_ui.py) 的 `github_logged_in_page` fixture 中。
+
+测试假定账号和密码已经配置在运行环境中：
+
+```bash
+export GITHUB_UI_USERNAME=your-test-account
+export GITHUB_UI_PASSWORD=your-test-password
+
+pytest tests/ui/test_github_login.py -m ui --browser-channel=chrome
+```
+
+fixture 完成登录，并校验页面中的 `user-login` 与配置账号一致。凭据不应写入仓库。
 
 ## 目录结构
 
@@ -142,14 +161,18 @@ pytest tests/test_github_search_live.py -m integration
 │       ├── fixtures/
 │       │   ├── __init__.py
 │       │   ├── base.py
-│       │   └── github.py
+│       │   ├── github.py
+│       │   └── github_ui.py
 │       └── services/
 │           ├── __init__.py
 │           ├── base.py
 │           ├── registry.py
 │           └── github.py
 └── tests/
-    └── test_github_search_live.py
+    ├── api/
+    │   └── test_github_search_live.py
+    └── ui/
+        └── test_github_login.py
 ```
 
 ## 新增其他 SDK

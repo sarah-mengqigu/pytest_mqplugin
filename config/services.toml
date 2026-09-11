@@ -1,4 +1,4 @@
 [services.github]
 base_url = "https://api.github.com"
-token = "${GITHUB_TOKEN:-}"
+token = "${GITHUB_TOKEN}"
 timeout = 15

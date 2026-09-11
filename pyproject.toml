@@ -35,7 +35,9 @@ dependencies = [
 dev = [
   "build>=1.2",
   "pytest>=7.4",
+  "playwright>=1.62.0",
   "pytest-cov>=4.1",
+  "pytest-playwright>=0.9.0",
   "ruff>=0.6",
 ]
 
@@ -56,6 +58,7 @@ pythonpath = ["src"]
 markers = [
   "integration: tests that call external services",
   "myplugin: tests that exercise the pytest-myplugin example extension",
+  "ui: browser-based UI tests",
 ]
 
 [tool.coverage.run]
