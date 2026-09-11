@@ -1,0 +1,11 @@
+{
+  "request_name": "search_repositories",
+  "parameters": {
+    "query": "",
+    "sort": "stars",
+    "order": "desc"
+  },
+  "expectation": {
+    "code": 422
+  }
+}

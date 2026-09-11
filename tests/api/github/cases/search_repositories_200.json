@@ -1,0 +1,11 @@
+{
+  "request_name": "search_repositories",
+  "parameters": {
+    "query": "pytest language:Python stars:>100",
+    "sort": "stars",
+    "order": "desc"
+  },
+  "expectation": {
+    "code": 200
+  }
+}

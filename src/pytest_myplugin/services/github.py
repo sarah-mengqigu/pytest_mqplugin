@@ -7,17 +7,19 @@ from dataclasses import dataclass
 from types import TracebackType
 from typing import TYPE_CHECKING, Any
 
-from github import Auth, Github
+from github import Auth, Github, GithubException
+from github.GithubObject import CompletableGithubObject
+from github.PaginatedList import PaginatedList
+from github.Repository import RepositorySearchResult
 
-from .base import Service
+from .base import ApiCallResult, Service
 
 if TYPE_CHECKING:
     from github.AuthenticatedUser import AuthenticatedUser
     from github.NamedUser import NamedUser
     from github.Organization import Organization
-    from github.PaginatedList import PaginatedList
     from github.RateLimitOverview import RateLimitOverview
-    from github.Repository import Repository, RepositorySearchResult
+    from github.Repository import Repository
 
 DEFAULT_BASE_URL = "https://api.github.com"
 DEFAULT_TIMEOUT = 15
@@ -40,14 +42,21 @@ class GithubSettings:
             raise ValueError(f"Unknown GitHub setting(s): {names}")
 
         token_value = config.get("token")
-        token = str(token_value).strip() if token_value is not None else None
+        if token_value is not None and not isinstance(token_value, str):
+            raise ValueError("GitHub token must be a string")
+        token = token_value.strip() if token_value else None
 
         base_url_value = config.get("base_url", DEFAULT_BASE_URL)
-        base_url = str(base_url_value).strip()
+        if not isinstance(base_url_value, str):
+            raise ValueError("GitHub base_url must be a string")
+        base_url = base_url_value.strip()
         if not base_url:
             raise ValueError("GitHub base_url must not be empty")
 
-        timeout = int(config.get("timeout", DEFAULT_TIMEOUT))
+        timeout_value = config.get("timeout", DEFAULT_TIMEOUT)
+        if type(timeout_value) is not int:
+            raise ValueError("GitHub timeout must be an integer")
+        timeout = timeout_value
         if timeout <= 0:
             raise ValueError("GitHub timeout must be greater than zero")
 
@@ -91,7 +100,42 @@ class GithubClient(Service):
         **qualifiers: Any,
     ) -> PaginatedList[RepositorySearchResult]:
         """Search repositories using the GitHub search API."""
-        return self._github_client.search_repositories(query, **qualifiers)
+        if query:
+            return self._github_client.search_repositories(query, **qualifiers)
+
+        # PyGithub rejects an empty query locally. Build the request directly
+        # so negative API cases can verify GitHub's server-side validation.
+        parameters = {"q": query, **qualifiers}
+        return PaginatedList(
+            RepositorySearchResult,
+            self._github_client.requester,
+            "/search/repositories",
+            parameters,
+        )
+
+    def invoke(
+        self,
+        request_name: str,
+        parameters: Mapping[str, Any],
+    ) -> ApiCallResult:
+        """Invoke a GitHub method by name and normalize its response code."""
+        if request_name.startswith("_") or request_name in {
+            "close",
+            "invoke",
+            "raw_client",
+        }:
+            raise ValueError(f"GitHub method {request_name!r} is not invokable")
+
+        method = getattr(self, request_name)
+        if not callable(method):
+            raise TypeError(f"GitHub attribute {request_name!r} is not callable")
+
+        try:
+            data = method(**dict(parameters))
+            _materialize_response(data)
+            return ApiCallResult(code=200, data=data)
+        except GithubException as error:
+            return ApiCallResult(code=error.status or 500, data=error.data)
 
     def close(self) -> None:
         """Close the underlying HTTP connections."""
@@ -125,3 +169,11 @@ def build_github_client(config: Mapping[str, Any]) -> GithubClient:
 
     github_client = Github(**client_kwargs)
     return GithubClient(github_client)
+
+
+def _materialize_response(data: Any) -> None:
+    """Trigger lazy PyGithub requests so the API call reports a real status."""
+    if isinstance(data, PaginatedList):
+        _ = data.totalCount
+    elif isinstance(data, CompletableGithubObject):
+        _ = data.raw_data

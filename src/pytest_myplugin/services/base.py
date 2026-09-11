@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from typing import Any, Protocol, runtime_checkable
 
 
@@ -15,3 +16,11 @@ class Service(Protocol):
 
 
 ServiceBuilder = Callable[[Mapping[str, Any]], Service]
+
+
+@dataclass(frozen=True, slots=True)
+class ApiCallResult:
+    """Normalized result of an SDK-backed API request."""
+
+    code: int
+    data: Any

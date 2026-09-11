@@ -33,6 +33,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+  "allure-pytest>=2.16.0",
   "build>=1.2",
   "pytest>=7.4",
   "playwright>=1.62.0",
@@ -56,6 +57,7 @@ addopts = "-ra --strict-config --strict-markers"
 testpaths = ["tests"]
 pythonpath = ["src"]
 markers = [
+  "api: JSON-defined API test cases",
   "integration: tests that call external services",
   "myplugin: tests that exercise the pytest-myplugin example extension",
   "ui: browser-based UI tests",
