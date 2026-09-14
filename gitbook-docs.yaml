@@ -1,0 +1,11 @@
+version: 1
+site:
+  title: pytest-myplugin
+  structure:
+    - type: space
+      key: space-doc
+      title: Doc
+      path: doc
+      default: true
+      content:
+        directory: ./doc
